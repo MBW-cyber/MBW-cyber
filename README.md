@@ -52,3 +52,22 @@ In `runs/<run_id>/`:
 
 - Dit is een lokale MVP zonder externe model-calls.
 - TRELLIS/Hunyuan en echte physics/USD export kunnen via dezelfde interfaces worden aangesloten.
+
+
+## HTTP API
+
+Start server:
+
+```bash
+PYTHONPATH=src python -m mbw_cyber.run_api --host 127.0.0.1 --port 8000 --state-root .mbw_api
+```
+
+Beschikbare endpoints:
+
+- `POST /scene/generate`
+- `POST /assets/generate`
+- `POST /scene/assemble`
+- `POST /sim/run`
+- `POST /sim/replay`
+- `GET  /runs/{id}`
+- `GET  /assets/{id}`
