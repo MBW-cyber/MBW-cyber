@@ -4,3 +4,5 @@ __pycache__/
 runs/
 .venv/
 .mbw_api/
+apps/web/node_modules/
+apps/web/dist/

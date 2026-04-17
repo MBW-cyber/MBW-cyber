@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from .models import SceneSpec
+from .models import SceneSpec, SimSpec
 from .pipeline import AssetGenerator, LLMPlanner, RunStore, SceneAssembler, SimulationCompiler, run_pipeline
 
 
@@ -47,6 +47,12 @@ class MBWApiHandler(BaseHTTPRequestHandler):
         if parsed.path == "/scene/generate":
             self.handle_scene_generate()
             return
+        if parsed.path == "/scene/compile":
+            self.handle_scene_compile()
+            return
+        if parsed.path == "/scene/validate":
+            self.handle_scene_validate()
+            return
         if parsed.path == "/assets/generate":
             self.handle_assets_generate()
             return
@@ -63,6 +69,12 @@ class MBWApiHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/health":
+            self._write_json(HTTPStatus.OK, {"ok": True})
+            return
+        if parsed.path == "/runs":
+            self.handle_list_runs()
+            return
         if parsed.path.startswith("/runs/"):
             self.handle_get_run(parsed.path.split("/", 2)[2])
             return
@@ -77,10 +89,49 @@ class MBWApiHandler(BaseHTTPRequestHandler):
         self._write_json(
             HTTPStatus.OK,
             {
-                "scene_spec": asdict(scene_spec),
-                "sim_spec": asdict(sim_spec),
+                "scene": asdict(scene_spec),
+                "sim": asdict(sim_spec),
             },
         )
+
+    def handle_scene_compile(self) -> None:
+        payload = self._read_json()
+        scene_payload = payload.get("scene") if isinstance(payload.get("scene"), dict) else payload
+        sim_payload = payload.get("sim") if isinstance(payload.get("sim"), dict) else payload
+
+        scene_spec = SceneSpec.from_payload(scene_payload)
+        sim_spec = SimSpec.from_payload(sim_payload, seed=int(sim_payload.get("seed", 42)))
+        compiled_sim = SimulationCompiler().compile(sim_spec, scene_spec)
+        self._write_json(
+            HTTPStatus.OK,
+            {
+                "scene_id": f"scene_{sim_spec.seed}",
+                "scene": asdict(scene_spec),
+                "sim": asdict(sim_spec),
+                "objects": compiled_sim["physics"]["objects"],
+                "compiled_sim": compiled_sim,
+            },
+        )
+
+    def handle_scene_validate(self) -> None:
+        payload = self._read_json()
+        errors: list[str] = []
+
+        objects = payload.get("objects")
+        if objects is not None and not isinstance(objects, list):
+            errors.append("objects must be a list")
+        if isinstance(objects, list):
+            for index, obj in enumerate(objects):
+                if not isinstance(obj, dict):
+                    errors.append(f"objects[{index}] must be an object")
+                    continue
+                if "id" not in obj:
+                    errors.append(f"objects[{index}] is missing id")
+                if "class" not in obj:
+                    errors.append(f"objects[{index}] is missing class")
+
+        valid = len(errors) == 0
+        self._write_json(HTTPStatus.OK if valid else HTTPStatus.BAD_REQUEST, {"valid": valid, "errors": errors})
 
     def handle_assets_generate(self) -> None:
         payload = self._read_json()
@@ -125,6 +176,24 @@ class MBWApiHandler(BaseHTTPRequestHandler):
         replay = json.loads(replay_file.read_text(encoding="utf-8"))
         trajectory = json.loads(trajectory_file.read_text(encoding="utf-8"))
         self._write_json(HTTPStatus.OK, {"replay": replay, "trajectory": trajectory})
+
+    def handle_list_runs(self) -> None:
+        runs: list[dict[str, Any]] = []
+        for run_dir in sorted(self.store.runs_dir.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            summary_file = run_dir / "run_summary.json"
+            metrics_file = run_dir / "metrics.json"
+            if not summary_file.exists() or not metrics_file.exists():
+                continue
+            runs.append(
+                {
+                    "run_id": run_dir.name,
+                    "summary": json.loads(summary_file.read_text(encoding="utf-8")),
+                    "metrics": json.loads(metrics_file.read_text(encoding="utf-8")),
+                }
+            )
+        self._write_json(HTTPStatus.OK, {"runs": runs})
 
     def handle_get_run(self, run_id: str) -> None:
         run_dir = self.store.run_dir(run_id)

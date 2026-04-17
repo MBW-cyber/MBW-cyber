@@ -64,10 +64,33 @@ PYTHONPATH=src python -m mbw_cyber.run_api --host 127.0.0.1 --port 8000 --state-
 
 Beschikbare endpoints:
 
+- `GET  /health`
 - `POST /scene/generate`
+- `POST /scene/validate`
+- `POST /scene/compile`
 - `POST /assets/generate`
 - `POST /scene/assemble`
 - `POST /sim/run`
 - `POST /sim/replay`
+- `GET  /runs`
 - `GET  /runs/{id}`
 - `GET  /assets/{id}`
+
+
+## Web UI (React + Rapier)
+
+Er staat nu een eenvoudige webclient in `apps/web` die prompt → generate → compile → run doorloopt en frames visualiseert met een slider.
+
+Start lokaal:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Optioneel API URL:
+
+```bash
+VITE_API_URL=http://localhost:8000 npm run dev
+```
