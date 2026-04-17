@@ -9,7 +9,7 @@ Dit project levert een **bruikbare pipeline** op basis van jouw architectuur:
 - Backend runtime → **Web Viewer + Rapier** of **Genesis/Isaac profiel**
 - Run Store → seeds, trajectories, metrics, replay metadata
 
-## Quickstart
+## Single run
 
 ```bash
 PYTHONPATH=src python -m mbw_cyber.run \
@@ -19,6 +19,20 @@ PYTHONPATH=src python -m mbw_cyber.run \
   --duration 12 \
   --hz 10
 ```
+
+## Experiment matrix (variations + metrics)
+
+```bash
+PYTHONPATH=src python -m mbw_cyber.run \
+  --input examples/warehouse_spec.json \
+  --experiment examples/experiment_spec.json \
+  --out runs \
+  --backend genesis_isaac \
+  --duration 8 \
+  --hz 6
+```
+
+Voor experiment mode wordt `runs/experiment_matrix.json` aangemaakt met alle variatie-cases, seeds, run directories en gevraagde metrics.
 
 ## Output per run
 
