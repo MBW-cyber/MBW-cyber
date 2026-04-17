@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +10,27 @@ class SceneSpec:
     environment: dict[str, Any]
     objects: list[dict[str, Any]]
 
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "SceneSpec":
+        return cls(
+            environment=dict(payload.get("environment", {})),
+            objects=list(payload.get("objects", [])),
+        )
+
 
 @dataclass
 class SimSpec:
     agents: list[dict[str, Any]]
     events: list[dict[str, Any]]
     seed: int
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any], seed: int) -> "SimSpec":
+        return cls(
+            agents=list(payload.get("agents", [])),
+            events=list(payload.get("events", [])),
+            seed=seed,
+        )
 
 
 @dataclass
@@ -26,6 +41,14 @@ class AssetRecord:
     path: str
     collider: str = "convex_hull"
     lod: str = "auto"
+    repaired: bool = False
+
+
+@dataclass
+class BackendConfig:
+    name: str = "web_rapier"
+    duration_s: int = 12
+    hz: int = 10
 
 
 @dataclass

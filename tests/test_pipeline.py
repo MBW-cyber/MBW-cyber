@@ -22,7 +22,7 @@ def test_pipeline_generates_expected_artifacts(tmp_path: Path) -> None:
         "events": [{"t": 1, "type": "spawn", "target": "forklift_2"}],
     }
 
-    artifacts = run_pipeline(payload, tmp_path)
+    artifacts = run_pipeline(payload, tmp_path, backend="genesis_isaac", duration_s=3, hz=4)
 
     expected = {
         "scene_spec.json",
@@ -32,6 +32,7 @@ def test_pipeline_generates_expected_artifacts(tmp_path: Path) -> None:
         "scene_manifest.json",
         "trajectory.json",
         "metrics.json",
+        "replay.json",
         "run_summary.json",
     }
 
@@ -41,3 +42,7 @@ def test_pipeline_generates_expected_artifacts(tmp_path: Path) -> None:
     compiled = json.loads((artifacts.root / "compiled_sim.json").read_text())
     assert compiled["physics"]["objects"][0]["body"] == "dynamic"
     assert compiled["event_graph"][0]["type"] == "spawn"
+
+    metrics = json.loads((artifacts.root / "metrics.json").read_text())
+    assert metrics["backend"] == "genesis_isaac"
+    assert metrics["frames"] == 12

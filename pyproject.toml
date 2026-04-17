@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbw-cyber"
-version = "0.1.0"
-description = "MVP pipeline for Text-to-3D and generative simulation"
+version = "0.2.0"
+description = "Pipeline for Text-to-3D and generative simulation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
