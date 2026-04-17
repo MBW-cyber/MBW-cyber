@@ -1,0 +1,35 @@
+{
+  "environment": {
+    "type": "warehouse",
+    "size": [20, 12, 6],
+    "floor_material": "concrete"
+  },
+  "objects": [
+    {
+      "id": "forklift_1",
+      "class": "forklift",
+      "source": "generate",
+      "prompt": "yellow electric forklift, industrial, realistic",
+      "position": [2, 0, 4],
+      "rotation": [0, 1.57, 0],
+      "physics": { "body": "dynamic", "mass": 1200 }
+    },
+    {
+      "id": "pallet_stack_1",
+      "class": "pallet_stack",
+      "source": "asset_library",
+      "position": [6, 0, 4],
+      "physics": { "body": "dynamic", "mass": 300 }
+    }
+  ],
+  "agents": [
+    {
+      "id": "worker_1",
+      "goal": "move pallets to loading zone",
+      "policy": "llm_planner"
+    }
+  ],
+  "events": [
+    { "t": 5, "type": "spawn", "target": "forklift_2" }
+  ]
+}
