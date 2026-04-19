@@ -1,0 +1,8 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+runs/
+.venv/
+.mbw_api/
+apps/web/node_modules/
+apps/web/dist/

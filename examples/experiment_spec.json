@@ -1,0 +1,9 @@
+{
+  "seed": 18442,
+  "variations": {
+    "num_workers": [2, 5],
+    "spawn_interval_sec": [10, 45],
+    "forklift_speed": [1.0, 2.4]
+  },
+  "metrics": ["collisions", "task_completion", "travel_time"]
+}
