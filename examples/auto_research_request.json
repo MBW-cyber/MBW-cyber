@@ -1,0 +1,7 @@
+{
+  "budget_eur": 50000,
+  "target_range_km": 500,
+  "min_cargo_l": 450,
+  "annual_km": 20000,
+  "preferred_powertrain": "ev"
+}

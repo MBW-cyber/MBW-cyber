@@ -94,3 +94,29 @@ Optioneel API URL:
 ```bash
 VITE_API_URL=http://localhost:8000 npm run dev
 ```
+
+
+## AI Auto Research MVP
+
+Een direct bruikbaar auto-advies systeem (zonder externe API-calls) zit nu in `mbw_cyber.auto_research`.
+
+Run:
+
+```bash
+PYTHONPATH=src python -m mbw_cyber.auto_research \
+  --input examples/auto_research_request.json \
+  --out runs/auto_research
+```
+
+Output:
+
+- `runs/auto_research/auto_research_report.md` (mens-leesbaar advies)
+- `runs/auto_research/auto_research_result.json` (ranking + score breakdown)
+
+Input velden:
+
+- `budget_eur`
+- `target_range_km`
+- `min_cargo_l`
+- `annual_km`
+- `preferred_powertrain` (`ev`, `hybrid`, of `any`)
