@@ -12,6 +12,7 @@ from typing import Any
 class CarOption:
     model: str
     powertrain: str
+    segment: str
     msrp_eur: int
     wlpt_range_km: int
     safety_score: float
@@ -28,6 +29,8 @@ class ResearchRequest:
     min_cargo_l: int
     annual_km: int
     preferred_powertrain: str
+    prefer_segment: str
+    top_k: int
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> "ResearchRequest":
@@ -37,19 +40,33 @@ class ResearchRequest:
             min_cargo_l=int(payload.get("min_cargo_l", 400)),
             annual_km=int(payload.get("annual_km", 18000)),
             preferred_powertrain=str(payload.get("preferred_powertrain", "ev")).lower(),
+            prefer_segment=str(payload.get("prefer_segment", "any")).lower(),
+            top_k=max(1, int(payload.get("top_k", 5))),
         )
 
 
 CAR_DATABASE = [
-    CarOption("Tesla Model 3 RWD", "ev", 41990, 513, 4.7, 561, 410, 4.2, 4),
-    CarOption("Hyundai IONIQ 5 77kWh", "ev", 46995, 507, 4.8, 527, 430, 4.4, 5),
-    CarOption("Kia EV6 Air", "ev", 45895, 528, 4.8, 490, 420, 4.3, 7),
-    CarOption("Skoda Enyaq 85", "ev", 49990, 565, 4.9, 585, 390, 4.5, 2),
-    CarOption("Toyota Corolla Touring Hybrid", "hybrid", 36995, 900, 4.9, 596, 360, 4.8, 10),
-    CarOption("Volvo XC40 Recharge Single Motor", "ev", 52995, 480, 4.9, 452, 470, 4.2, 3),
-    CarOption("MG4 Long Range", "ev", 36985, 450, 4.4, 363, 350, 4.0, 7),
-    CarOption("BMW i4 eDrive35", "ev", 57900, 483, 4.8, 470, 520, 4.1, 2),
+    CarOption("Tesla Model 3 RWD", "ev", "sedan", 41990, 513, 4.7, 561, 410, 4.2, 4),
+    CarOption("Hyundai IONIQ 5 77kWh", "ev", "suv", 46995, 507, 4.8, 527, 430, 4.4, 5),
+    CarOption("Kia EV6 Air", "ev", "suv", 45895, 528, 4.8, 490, 420, 4.3, 7),
+    CarOption("Skoda Enyaq 85", "ev", "suv", 49990, 565, 4.9, 585, 390, 4.5, 2),
+    CarOption("Toyota Corolla Touring Hybrid", "hybrid", "wagon", 36995, 900, 4.9, 596, 360, 4.8, 10),
+    CarOption("Volvo XC40 Recharge Single Motor", "ev", "suv", 52995, 480, 4.9, 452, 470, 4.2, 3),
+    CarOption("MG4 Long Range", "ev", "hatchback", 36985, 450, 4.4, 363, 350, 4.0, 7),
+    CarOption("BMW i4 eDrive35", "ev", "sedan", 57900, 483, 4.8, 470, 520, 4.1, 2),
 ]
+
+
+CHATGPT_55_SCORING_WEIGHTS = {
+    "budget_fit": 0.20,
+    "range_fit": 0.20,
+    "cargo_fit": 0.10,
+    "safety_fit": 0.15,
+    "reliability_fit": 0.12,
+    "powertrain_fit": 0.08,
+    "segment_fit": 0.05,
+    "ownership_fit": 0.10,
+}
 
 
 def _clamp01(value: float) -> float:
@@ -57,18 +74,17 @@ def _clamp01(value: float) -> float:
 
 
 def _score_car(car: CarOption, request: ResearchRequest) -> tuple[float, dict[str, float]]:
-    budget_fit = _clamp01((request.budget_eur - car.msrp_eur + 12000) / 24000)
+    budget_fit = _clamp01((request.budget_eur - car.msrp_eur + 10000) / 22000)
     range_fit = _clamp01(car.wlpt_range_km / max(request.target_range_km, 1))
     cargo_fit = _clamp01(car.cargo_l / max(request.min_cargo_l, 1))
     safety_fit = _clamp01(car.safety_score / 5)
     reliability_fit = _clamp01(car.reliability_score / 5)
 
-    preferred = request.preferred_powertrain
-    powertrain_fit = 1.0 if preferred in {"any", car.powertrain} else 0.45
+    powertrain_fit = 1.0 if request.preferred_powertrain in {"any", car.powertrain} else 0.45
+    segment_fit = 1.0 if request.prefer_segment in {"any", car.segment} else 0.65
 
     yearly_energy_cost = 0.04 * request.annual_km if car.powertrain == "ev" else 0.07 * request.annual_km
-    yearly_total_cost = yearly_energy_cost + car.service_cost_year_eur
-    cost_fit = _clamp01(1 - (yearly_total_cost / 2600))
+    ownership_fit = _clamp01(1 - ((yearly_energy_cost + car.service_cost_year_eur) / 2800))
 
     score_breakdown = {
         "budget_fit": budget_fit,
@@ -77,21 +93,15 @@ def _score_car(car: CarOption, request: ResearchRequest) -> tuple[float, dict[st
         "safety_fit": safety_fit,
         "reliability_fit": reliability_fit,
         "powertrain_fit": powertrain_fit,
-        "cost_fit": cost_fit,
+        "segment_fit": segment_fit,
+        "ownership_fit": ownership_fit,
     }
-    weighted_score = (
-        budget_fit * 0.22
-        + range_fit * 0.22
-        + cargo_fit * 0.1
-        + safety_fit * 0.16
-        + reliability_fit * 0.12
-        + powertrain_fit * 0.08
-        + cost_fit * 0.1
-    )
+
+    weighted_score = sum(score_breakdown[k] * CHATGPT_55_SCORING_WEIGHTS[k] for k in CHATGPT_55_SCORING_WEIGHTS)
     return round(weighted_score * 100, 2), score_breakdown
 
 
-def rank_cars(request: ResearchRequest, limit: int = 5) -> list[dict[str, Any]]:
+def rank_cars(request: ResearchRequest) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
     for car in CAR_DATABASE:
         score, breakdown = _score_car(car, request)
@@ -100,16 +110,21 @@ def rank_cars(request: ResearchRequest, limit: int = 5) -> list[dict[str, Any]]:
                 "score": score,
                 "car": asdict(car),
                 "score_breakdown": {k: round(v, 3) for k, v in breakdown.items()},
+                "labels": [
+                    "budget_ok" if breakdown["budget_fit"] >= 0.7 else "budget_stretch",
+                    "long_range" if breakdown["range_fit"] >= 0.95 else "mid_range",
+                    "low_running_cost" if breakdown["ownership_fit"] >= 0.6 else "higher_running_cost",
+                ],
             }
         )
 
     ranked.sort(key=lambda item: item["score"], reverse=True)
-    return ranked[:limit]
+    return ranked[: request.top_k]
 
 
 def build_report(request: ResearchRequest, ranking: list[dict[str, Any]]) -> str:
     lines = [
-        "# AI Auto Research Report",
+        "# AI Auto Research Report (ChatGPT 5.5-stijl)",
         "",
         "## Requestprofiel",
         f"- Budget: €{request.budget_eur:,}",
@@ -117,26 +132,21 @@ def build_report(request: ResearchRequest, ranking: list[dict[str, Any]]) -> str
         f"- Minimaal bagageruimte: {request.min_cargo_l} liter",
         f"- Jaarlijkse kilometers: {request.annual_km:,}",
         f"- Voorkeur aandrijving: {request.preferred_powertrain}",
+        f"- Segment voorkeur: {request.prefer_segment}",
+        f"- Top-k shortlist: {request.top_k}",
         "",
         "## Top aanbevelingen",
     ]
 
     for index, candidate in enumerate(ranking, start=1):
         car = candidate["car"]
-        score = candidate["score"]
-        breakdown = candidate["score_breakdown"]
         lines.extend(
             [
-                f"### {index}. {car['model']} ({score}/100)",
-                f"- Prijs: €{car['msrp_eur']:,}",
-                f"- Range (WLTP): {car['wlpt_range_km']} km",
-                f"- Kofferbak: {car['cargo_l']} liter",
+                f"### {index}. {car['model']} ({candidate['score']}/100)",
+                f"- Prijs: €{car['msrp_eur']:,} | Segment: {car['segment']} | Aandrijving: {car['powertrain']}",
+                f"- Range (WLTP): {car['wlpt_range_km']} km | Kofferbak: {car['cargo_l']} liter",
                 f"- Veiligheid: {car['safety_score']}/5 | Betrouwbaarheid: {car['reliability_score']}/5",
-                (
-                    "- Match breakdown: "
-                    f"budget {breakdown['budget_fit']}, range {breakdown['range_fit']}, "
-                    f"cost {breakdown['cost_fit']}"
-                ),
+                f"- Labels: {', '.join(candidate['labels'])}",
                 "",
             ]
         )
@@ -146,8 +156,8 @@ def build_report(request: ResearchRequest, ranking: list[dict[str, Any]]) -> str
         [
             "## Volgende stap",
             f"- Gemiddelde kwaliteit van shortlist: {avg_score}/100.",
-            "- Plan 2 proefritten: #1 voor ratio, #2 voor comfort/afwerking.",
-            "- Vraag dealer-offertes op met verzekering + levertijd en herhaal ranking met echte offertes.",
+            "- Vergelijk TCO met echte offertes (aanschaf, financiering, stroom/brandstof, onderhoud, verzekering).",
+            "- Plan twee proefritten voor de top-2 en update input met je bevindingen.",
         ]
     )
     return "\n".join(lines)
@@ -162,21 +172,16 @@ def run_auto_research(payload: dict[str, Any], out_root: Path) -> dict[str, Any]
     report_path = out_root / "auto_research_report.md"
     result_path = out_root / "auto_research_result.json"
 
+    result = {
+        "engine": "chatgpt-5.5-style-local-mvp",
+        "weights": CHATGPT_55_SCORING_WEIGHTS,
+        "request": asdict(request),
+        "ranking": ranking,
+        "files": {"report": str(report_path), "result": str(result_path)},
+    }
+
     report_path.write_text(report, encoding="utf-8")
-    result_path.write_text(
-        json.dumps(
-            {
-                "request": asdict(request),
-                "ranking": ranking,
-                "files": {
-                    "report": str(report_path),
-                    "result": str(result_path),
-                },
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
     return {
         "request": asdict(request),
@@ -187,15 +192,16 @@ def run_auto_research(payload: dict[str, Any], out_root: Path) -> dict[str, Any]
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Simple AI auto research MVP")
+    parser = argparse.ArgumentParser(description="Simple AI auto research MVP (ChatGPT 5.5 stijl)")
     parser.add_argument("--input", required=True, help="Path to input request JSON")
     parser.add_argument("--out", default="runs/auto_research", help="Output directory")
     args = parser.parse_args()
 
     payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
     output = run_auto_research(payload, Path(args.out))
+    top = output["ranking"][0]
 
-    print(f"Top advies: {output['ranking'][0]['car']['model']} ({output['ranking'][0]['score']}/100)")
+    print(f"Top advies: {top['car']['model']} ({top['score']}/100)")
     print(f"Report: {output['report_path']}")
     print(f"Data: {output['result_path']}")
     return 0

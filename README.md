@@ -98,7 +98,7 @@ VITE_API_URL=http://localhost:8000 npm run dev
 
 ## AI Auto Research MVP
 
-Een direct bruikbaar auto-advies systeem (zonder externe API-calls) zit nu in `mbw_cyber.auto_research`.
+Een direct bruikbaar auto-advies systeem (zonder externe API-calls) zit nu in `mbw_cyber.auto_research`, opnieuw opgezet in ChatGPT 5.5-stijl scoring.
 
 Run:
 
@@ -120,3 +120,5 @@ Input velden:
 - `min_cargo_l`
 - `annual_km`
 - `preferred_powertrain` (`ev`, `hybrid`, of `any`)
+- `prefer_segment` (`suv`, `sedan`, `wagon`, `hatchback`, of `any`)
+- `top_k` (aantal aanbevelingen)
