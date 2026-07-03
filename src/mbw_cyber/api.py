@@ -47,8 +47,16 @@ class MBWApiHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
@@ -138,8 +146,6 @@ class MBWApiHandler(BaseHTTPRequestHandler):
                     continue
                 if "id" not in obj:
                     errors.append(f"objects[{index}] is missing id")
-                if "class" not in obj:
-                    errors.append(f"objects[{index}] is missing class")
 
         valid = len(errors) == 0
         self._write_json(HTTPStatus.OK if valid else HTTPStatus.BAD_REQUEST, {"valid": valid, "errors": errors})
