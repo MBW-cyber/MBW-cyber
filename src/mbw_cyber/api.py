@@ -9,7 +9,15 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .models import SceneSpec, SimSpec
-from .pipeline import AssetGenerator, LLMPlanner, RunStore, SceneAssembler, SimulationCompiler, run_pipeline
+from .pipeline import (
+    AssetGenerator,
+    LLMPlanner,
+    RunStore,
+    SceneAssembler,
+    SimulationCompiler,
+    run_experiment_matrix,
+    run_pipeline,
+)
 
 
 class ApiStore:
@@ -64,6 +72,9 @@ class MBWApiHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/sim/replay":
             self.handle_sim_replay()
+            return
+        if parsed.path == "/experiment/run":
+            self.handle_experiment_run()
             return
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
 
@@ -176,6 +187,24 @@ class MBWApiHandler(BaseHTTPRequestHandler):
         replay = json.loads(replay_file.read_text(encoding="utf-8"))
         trajectory = json.loads(trajectory_file.read_text(encoding="utf-8"))
         self._write_json(HTTPStatus.OK, {"replay": replay, "trajectory": trajectory})
+
+    def handle_experiment_run(self) -> None:
+        payload = self._read_json()
+        base = payload.get("base") if isinstance(payload.get("base"), dict) else {}
+        experiment = payload.get("experiment") if isinstance(payload.get("experiment"), dict) else {}
+        backend = payload.get("backend", "web_rapier")
+        duration_s = int(payload.get("duration", 8))
+        hz = int(payload.get("hz", 6))
+
+        matrix = run_experiment_matrix(
+            base,
+            experiment,
+            self.store.runs_dir,
+            backend=backend,
+            duration_s=duration_s,
+            hz=hz,
+        )
+        self._write_json(HTTPStatus.OK, {"matrix": matrix})
 
     def handle_list_runs(self) -> None:
         runs: list[dict[str, Any]] = []

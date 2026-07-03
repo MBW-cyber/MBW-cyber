@@ -92,3 +92,45 @@ def test_api_endpoints_roundtrip(tmp_path: Path) -> None:
     conn.close()
     server.shutdown()
     thread.join(timeout=2)
+
+
+def test_experiment_run_endpoint(tmp_path: Path) -> None:
+    server = create_server(host="127.0.0.1", port=0, state_root=str(tmp_path / "api_state"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    host, port = server.server_address
+    conn = HTTPConnection(host, port)
+
+    payload = {
+        "base": {
+            "environment": {"type": "warehouse"},
+            "objects": [
+                {
+                    "id": "forklift_1",
+                    "class": "forklift",
+                    "source": "generate",
+                    "prompt": "yellow forklift",
+                    "physics": {"body": "dynamic", "mass": 1200},
+                }
+            ],
+            "agents": [{"id": "worker_1", "goal": "move pallet"}],
+        },
+        "experiment": {
+            "seed": 18442,
+            "variations": {"num_workers": [2, 5], "forklift_speed": [1.0, 2.4]},
+            "metrics": ["collisions", "task_completion"],
+        },
+        "duration": 2,
+        "hz": 2,
+    }
+
+    status, resp = _request_json(conn, "POST", "/experiment/run", payload)
+    assert status == 200
+    assert len(resp["matrix"]) == 4
+    assert all("collisions" in row["metrics"] for row in resp["matrix"])
+    assert len({row["seed"] for row in resp["matrix"]}) == 4
+
+    conn.close()
+    server.shutdown()
+    thread.join(timeout=2)

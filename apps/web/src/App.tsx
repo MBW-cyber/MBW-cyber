@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { generateScene, compileScene, runSim } from "./api/client"
 import { SceneViewer } from "./components/SceneViewer"
+import { ExperimentLab } from "./experiments/ExperimentLab"
 import type { CompiledScene, RunResult } from "./scene/types"
 
 export default function App() {
+  const [showLab, setShowLab] = useState(false)
   const [prompt, setPrompt] = useState("Bouw een magazijn met een heftruck en drie pallets")
   const [compiled, setCompiled] = useState<CompiledScene | null>(null)
   const [run, setRun] = useState<RunResult | null>(null)
@@ -29,10 +31,15 @@ export default function App() {
     }
   }
 
+  if (showLab) return <ExperimentLab onBack={() => setShowLab(false)} />
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", height: "100vh" }}>
       <div style={{ padding: 16, borderRight: "1px solid #ddd" }}>
         <h2>Text-to-3D Sim</h2>
+        <button onClick={() => setShowLab(true)} style={{ marginBottom: 12 }}>
+          Experiment Lab →
+        </button>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}

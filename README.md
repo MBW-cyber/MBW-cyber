@@ -72,6 +72,7 @@ Beschikbare endpoints:
 - `POST /scene/assemble`
 - `POST /sim/run`
 - `POST /sim/replay`
+- `POST /experiment/run` *(experimenteel)*
 - `GET  /runs`
 - `GET  /runs/{id}`
 - `GET  /assets/{id}`
@@ -79,7 +80,7 @@ Beschikbare endpoints:
 
 ## Web UI (React + Rapier)
 
-Er staat nu een eenvoudige webclient in `apps/web` die prompt → generate → compile → run doorloopt en frames visualiseert met een slider.
+Er staat nu een eenvoudige webclient in `apps/web` die prompt → generate → compile → run doorloopt en frames visualiseert met een slider. Daarnaast is er een **experimenteel Experiment Lab** (knop linksboven) dat variatie-sweeps draait via `POST /experiment/run` en de matrixresultaten toont.
 
 Start lokaal:
 
